@@ -36,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 编译完成的IPA安装包
-          path: *.ipa
+          path: "*.ipa"
