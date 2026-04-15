@@ -1,39 +1,56 @@
 name: iOS Build IPA
-on: push
+on: [push, workflow_dispatch]
+
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
+      # 关键修复点：改用 v4 以下的稳定版本，避开 Node.js 20 弃用警告
       - name: 拉取项目代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: 自动安装CocoaPods依赖
+      - name: 安装依赖（仅在需要时运行）
         run: |
           if [ -f Podfile ]; then
-            pod install
+            gem install cocoapods
+            pod install --repo-update
           fi
 
-      - name: 免签名编译IPA
+      - name: 编译并打包IPA
         run: |
-          PROJECT_NAME="ACETrack"
-          BUNDLE_ID="com.acetrack.testapp"
-          # 用了CocoaPods的话，把下面的-project改成-workspace，后缀改成.xcworkspace
-          xcodebuild -project ${PROJECT_NAME}.xcodeproj \
-                     -scheme ${PROJECT_NAME} \
+          PROJECT_NAME="tennisdeagle"
+          BUNDLE_ID="com.你的名字.tennisdeagle" # 替换为实际Bundle ID
+          
+          # 根据是否使用CocoaPods选择：
+          # 1. 有 .xcworkspace 文件（用了Pods）
+          xcodebuild -workspace "${PROJECT_NAME}.xcworkspace" \
+                     -scheme "${PROJECT_NAME}" \
                      -configuration Debug \
                      -sdk iphoneos \
                      CODE_SIGN_IDENTITY="" \
                      CODE_SIGNING_REQUIRED=NO \
                      CODE_SIGNING_ALLOWED=NO \
+                     CONFIGURATION_BUILD_DIR="$(pwd)/build" \
                      clean build
+          
+          # 2. 只有 .xcodeproj 文件（没用Pods）- 注释掉上面，用这个：
+          # xcodebuild -project "${PROJECT_NAME}.xcodeproj" \
+          #            -scheme "${PROJECT_NAME}" \
+          #            -configuration Debug \
+          #            -sdk iphoneos \
+          #            CODE_SIGN_IDENTITY="" \
+          #            CODE_SIGNING_REQUIRED=NO \
+          #            CODE_SIGNING_ALLOWED=NO \
+          #            CONFIGURATION_BUILD_DIR="$(pwd)/build" \
+          #            clean build
 
-          # 打包生成IPA
+          # 打包IPA
           mkdir -p Payload
-          cp -r build/Debug-iphoneos/${PROJECT_NAME}.app Payload/
-          zip -r ${PROJECT_NAME}.ipa Payload/
+          cp -r "build/Debug-iphoneos/${PROJECT_NAME}.app" Payload/
+          zip -r "${PROJECT_NAME}.ipa" Payload/
 
       - name: 输出IPA文件
         uses: actions/upload-artifact@v4
         with:
-          name: 编译完成的IPA安装包
+          name: iOS-IPA安装包
           path: "*.ipa"
